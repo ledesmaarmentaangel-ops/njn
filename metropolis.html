@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Metrópolis · Constructor de Metro</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#0f1420;--card:#18202f;--card2:#232d42;--tx:#e8edf7;--mut:#8b97ad;--acc:#ffb703;--ok:#2ecc71;--bad:#ff5d5d;--blue:#4aa3ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--card2);border:1px solid #33405b;border-radius:10px;padding:8px 10px;cursor:pointer}
+button:active{transform:scale(.97)}
+button.pri{background:var(--acc);color:#1a1300;border-color:var(--acc);font-weight:700}
+button.on{background:var(--blue);border-color:var(--blue);color:#001226;font-weight:700}
+button:disabled{opacity:.4;cursor:default}
+input,select{font:inherit;color:var(--tx);background:#0c111b;border:1px solid #33405b;border-radius:10px;padding:9px 10px;width:100%}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#top{flex:none;background:var(--card);padding:6px 10px;border-bottom:1px solid #2a3550;z-index:5}
+#top .r1{display:flex;align-items:center;gap:8px;justify-content:space-between}
+#top .r2{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
+.chip{background:var(--card2);border-radius:999px;padding:3px 9px;font-weight:600;white-space:nowrap}
+.chip.g{color:var(--ok)}.chip.r{color:var(--bad)}
+#cityname{font-weight:800;font-size:15px}
+#mapwrap{flex:1;min-height:0;position:relative}
+#map{position:absolute;inset:0;background:#cfd8e6}
+#linebar{position:absolute;left:8px;right:8px;top:8px;z-index:500;display:none;gap:6px;flex-wrap:wrap}
+#linebar.show{display:flex}
+#linebar button{box-shadow:0 2px 8px #0008}
+#events{position:absolute;left:8px;top:8px;z-index:490;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+#linebar.show~#events{top:52px}
+.ev{background:#000b;border-radius:8px;padding:3px 8px;font-size:12px}
+#sheet{position:absolute;left:0;right:0;bottom:0;max-height:52%;overflow:auto;background:var(--card);border-top:1px solid #2a3550;border-radius:16px 16px 0 0;z-index:600;padding:10px 12px 14px;display:none;box-shadow:0 -6px 20px #0008}
+#sheet.show{display:block}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.row{display:flex;gap:8px;align-items:center;background:var(--card2);border-radius:12px;padding:8px;margin-bottom:7px}
+.grow{flex:1;min-width:0}.col{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:150px}
+.col button{padding:5px 8px}
+.dot{width:14px;height:14px;border-radius:50%;flex:none}
+.muted{color:var(--mut);font-size:12px}
+.bar{height:6px;background:#0c111b;border-radius:3px;margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok)}.bar i.red{background:var(--bad)}
+#toolbar{flex:none;background:var(--card);border-top:1px solid #2a3550;padding:6px 6px calc(6px + env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:space-between;z-index:5;overflow-x:auto}
+#toolbar button{flex:none;padding:7px 9px;min-width:44px}
+.sep{width:1px;background:#33405b;margin:0 2px;flex:none}
+#modal{position:fixed;inset:0;background:#000b;z-index:2000;display:none;align-items:center;justify-content:center;padding:14px}
+#modal.show{display:flex}
+#mcard{background:var(--card);border-radius:16px;padding:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;border:1px solid #33405b}
+#mcard h2{margin:0 0 8px;font-size:19px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cards{display:grid;gap:7px}
+.mode{display:flex;gap:8px;text-align:left;align-items:center;width:100%}
+.mode .ic{font-size:26px}
+.city{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;margin-bottom:5px}
+.city.sel{border-color:var(--acc);background:#3a2f0b}
+#toast{position:fixed;left:50%;top:84px;transform:translateX(-50%);background:#000d;color:#fff;padding:8px 14px;border-radius:12px;z-index:3000;max-width:88%;text-align:center;display:none;font-weight:600}
+.spin{width:34px;height:34px;border:4px solid #33405b;border-top-color:var(--acc);border-radius:50%;animation:sp 1s linear infinite;margin:10px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.kv div{background:var(--card2);border-radius:10px;padding:7px 9px}.kv b{display:block;font-size:16px}
+.tabs{display:flex;gap:5px;margin-bottom:8px}
+.leaflet-popup-content{margin:10px 12px;color:#111}
+.pop button{color:#111;background:#eef;border-color:#99a;margin:3px 3px 0 0;padding:5px 8px}
+label.sw{display:flex;align-items:center;gap:8px;margin:6px 0}
+label.sw input{width:auto}
+.leaflet-container{font:inherit}
+a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div class="r1"><span id="cityname">Metrópolis</span><span><span class="chip" id="cLvl"></span> <button onclick="openTab('more')" style="padding:4px 9px">⚙</button></span></div>
+    <div class="r2"><span class="chip" id="cMoney">$0</span><span class="chip" id="cMonth">Mes 1</span><span class="chip" id="cRiders">👥 0</span><span class="chip" id="cNet">±0</span><span class="chip" id="cScore">⭐ 0</span><span class="chip" id="cSat">🙂 0</span></div>
+  </div>
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div id="linebar"></div>
+    <div id="events"></div>
+    <div id="sheet"></div>
+  </div>
+  <div id="toolbar">
+    <button id="tExplore" onclick="setTool('explore')">🖐</button>
+    <button id="tBuild" onclick="setTool('build')">🔨 Construir</button>
+    <button id="tDemo" onclick="setTool('demolish')">🗑</button>
+    <button onclick="undo()">↩</button>
+    <span class="sep"></span>
+    <button id="s0" onclick="setSpeed(0)">⏸</button><button id="s1" onclick="setSpeed(1)">▶</button><button id="s2" onclick="setSpeed(2)">⏩</button><button id="s3" onclick="setSpeed(3)">⏭</button>
+    <span class="sep"></span>
+    <button onclick="openTab('lines')">🚇</button>
+    <button onclick="openTab('up')">⬆</button>
+    <button onclick="openTab('goals')">🏆</button>
+  </div>
+</div>
+<div id="modal"><div id="mcard"></div></div>
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+/* ===========================================================
+   METRÓPOLIS — constructor de redes de transporte en ciudades reales
+   Configura tu Google Sheet pegando la URL del Apps Script aquí
+   (o directamente en la pantalla de acceso).
+   =========================================================== */
+const DEFAULT_SHEET_URL = '';
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+//#SIM-START
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function dist(a,b){const x=(b.lng-a.lng)*Math.cos((a.lat+b.lat)*Math.PI/360)*111320,y=(b.lat-a.lat)*110540;return Math.hypot(x,y)}
+
+// costos en miles de dólares (k$) a escala cm=1
+const MODES={
+ metro:{n:'Metro',pre:'Línea',i:'🚇',st:9000,km:14000,mt:140,sm:12,speed:36,walk:800,head:4,cap:350000,dwell:0.8,gap:350,maxSeg:5000,fm:1,under:1,w:6,dash:null},
+ train:{n:'Tren suburbano',pre:'Tren',i:'🚆',st:5000,km:5500,mt:80,sm:8,speed:60,walk:900,head:10,cap:140000,dwell:1,gap:800,maxSeg:20000,fm:1.3,w:5,dash:null},
+ tram:{n:'Tren ligero / tranvía',pre:'Tranvía',i:'🚊',st:1800,km:3500,mt:60,sm:5,speed:22,walk:500,head:6,cap:80000,dwell:0.5,gap:250,maxSeg:4000,fm:0.9,w:4,dash:null},
+ brt:{n:'Autobús BRT',pre:'BRT',i:'🚌',st:400,km:900,mt:30,sm:2,speed:24,walk:450,head:3,cap:90000,dwell:0.4,gap:250,maxSeg:4000,fm:0.8,w:4,dash:'10 5'},
+ bus:{n:'Autobús urbano',pre:'Ruta',i:'🚍',st:60,km:120,mt:10,sm:0.5,speed:14,walk:350,head:8,cap:40000,dwell:0.5,gap:150,maxSeg:3000,fm:0.6,w:3,dash:'3 6'},
+ cable:{n:'Teleférico',pre:'Cable',i:'🚠',st:2500,km:3000,mt:50,sm:5,speed:20,walk:500,head:1,cap:25000,dwell:0.4,gap:400,maxSeg:3500,fm:0.9,w:3,dash:'1 7'}
+};
+const UPG=[
+ {id:'freq',n:'Frecuencia de trenes',i:'⏱',d:'Menos espera entre unidades (−22% por nivel).',max:5,base:12000},
+ {id:'cap',n:'Unidades más largas',i:'🚋',d:'+35% de capacidad en todas las líneas.',max:5,base:15000},
+ {id:'sig',n:'Señalización CBTC',i:'📡',d:'+5% de velocidad comercial.',max:4,base:20000},
+ {id:'acc',n:'Accesibilidad universal',i:'♿',d:'Rampas y ascensores: más satisfacción y +2% de usuarios.',max:5,base:8000},
+ {id:'app',n:'Tarjeta y app de pago',i:'💳',d:'+4% de usuarios por nivel.',max:5,base:6000},
+ {id:'clean',n:'Seguridad y limpieza',i:'🧹',d:'+2.5 de satisfacción por nivel.',max:5,base:5000},
+ {id:'ads',n:'Comercios y publicidad',i:'🏪',d:'Ingresos extra por cada estación en servicio.',max:5,base:7000},
+ {id:'energy',n:'Energía renovable',i:'☀️',d:'−7% de mantenimiento y más CO₂ evitado.',max:5,base:18000}
+];
+const DIFF={
+ facil:{n:'Fácil',m:2,c:0.8,ev:0.5},
+ normal:{n:'Normal',m:1,c:1,ev:1},
+ dificil:{n:'Difícil',m:0.6,c:1.25,ev:1.5},
+ sandbox:{n:'Sandbox (dinero infinito)',m:10000,c:1,ev:0.5}
+};
+const CITIES=[
+ {id:'cdmx',n:'Ciudad de México',c:'MX',lat:19.4326,lng:-99.1332,pop:21.8,cm:0.8,fare:0.6,car:20,q:1,fact:'El Metro de la CDMX abrió en 1969 y es de los más concurridos del mundo.'},
+ {id:'gdl',n:'Guadalajara',c:'MX',lat:20.6597,lng:-103.3496,pop:5.3,cm:0.7,fare:0.5,car:26,fact:'Guadalajara tiene el primer tren ligero de México, inaugurado en 1989.'},
+ {id:'mty',n:'Monterrey',c:'MX',lat:25.6866,lng:-100.3161,pop:5.3,cm:0.75,fare:0.6,car:27,fact:'El Metrorrey, inaugurado en 1991, es en gran parte elevado.'},
+ {id:'irapuato',n:'Irapuato',c:'MX',lat:20.6767,lng:-101.3563,pop:0.7,cm:0.45,fare:0.5,car:30,fact:'Irapuato, la capital de la fresa: hoy sin metro… ¡tú decides!'},
+ {id:'leon',n:'León',c:'MX',lat:21.1250,lng:-101.6860,pop:1.9,cm:0.55,fare:0.5,car:28,fact:'León cuenta con un BRT propio, el Optibús.'},
+ {id:'qro',n:'Querétaro',c:'MX',lat:20.5888,lng:-100.3899,pop:1.5,cm:0.55,fare:0.5,car:28,fact:'Una de las ciudades de mayor crecimiento industrial del país.'},
+ {id:'gto',n:'Guanajuato',c:'MX',lat:21.0190,lng:-101.2574,pop:0.2,cm:0.5,fare:0.5,car:18,fact:'Sus calles subterráneas, antiguos túneles mineros, ya sirven al tránsito.'},
+ {id:'puebla',n:'Puebla',c:'MX',lat:19.0414,lng:-98.2063,pop:3.2,cm:0.65,fare:0.5,car:25,q:1,fact:'Puebla ya opera un sistema de autobuses de tránsito rápido.'},
+ {id:'tijuana',n:'Tijuana',c:'MX',lat:32.5149,lng:-117.0382,pop:2.2,cm:0.7,fare:0.6,car:26,fact:'Frontera con San Diego: una de las más transitadas del mundo.'},
+ {id:'merida',n:'Mérida',c:'MX',lat:20.9674,lng:-89.5926,pop:1.3,cm:0.55,fare:0.5,car:28,fact:'Ciudad plana y con calor constante: ideal para un buen BRT.'},
+ {id:'bogota',n:'Bogotá',c:'CO',lat:4.7110,lng:-74.0721,pop:11,cm:0.8,fare:0.8,car:19,q:1,fact:'Bogotá abrió TransMilenio, su BRT, en el año 2000.'},
+ {id:'medellin',n:'Medellín',c:'CO',lat:6.2442,lng:-75.5812,pop:4,cm:0.8,fare:0.8,car:22,fact:'Medellín inauguró en 2004 su Metrocable, teleférico urbano de transporte.'},
+ {id:'lima',n:'Lima',c:'PE',lat:-12.0464,lng:-77.0428,pop:11,cm:0.75,fare:0.7,car:18,q:1,fact:'La Línea 1 de Lima es un metro elevado.'},
+ {id:'santiago',n:'Santiago',c:'CL',lat:-33.4489,lng:-70.6693,pop:7,cm:0.95,fare:1.1,car:23,q:1,fact:'El Metro de Santiago abrió en 1975.'},
+ {id:'baires',n:'Buenos Aires',c:'AR',lat:-34.6037,lng:-58.3816,pop:15,cm:0.85,fare:0.7,car:22,fact:'El Subte, de 1913, fue el primero de Latinoamérica.'},
+ {id:'saopaulo',n:'São Paulo',c:'BR',lat:-23.5505,lng:-46.6333,pop:22,cm:0.95,fare:1.0,car:17,fact:'El Metrô de São Paulo se inauguró en 1974.'},
+ {id:'rio',n:'Río de Janeiro',c:'BR',lat:-22.9068,lng:-43.1729,pop:13,cm:1.0,fare:1.0,car:20,fact:'El Metrô de Río abrió en 1979.'},
+ {id:'madrid',n:'Madrid',c:'ES',lat:40.4168,lng:-3.7038,pop:6.7,cm:1.4,fare:1.9,car:24,fact:'El Metro de Madrid abrió en 1919.'},
+ {id:'barcelona',n:'Barcelona',c:'ES',lat:41.3851,lng:2.1734,pop:5.6,cm:1.4,fare:2.0,car:23,fact:'El primer metro de Barcelona abrió en 1924.'},
+ {id:'paris',n:'París',c:'FR',lat:48.8566,lng:2.3522,pop:11,cm:1.9,fare:2.4,car:19,fact:'El Métro de París abrió en 1900.'},
+ {id:'londres',n:'Londres',c:'GB',lat:51.5074,lng:-0.1278,pop:9.5,cm:2.2,fare:3.5,car:18,fact:'El Underground (1863) es el metro más antiguo del mundo.'},
+ {id:'berlin',n:'Berlín',c:'DE',lat:52.5200,lng:13.4050,pop:3.7,cm:1.7,fare:3.0,car:25,fact:'El U-Bahn de Berlín funciona desde 1902.'},
+ {id:'roma',n:'Roma',c:'IT',lat:41.9028,lng:12.4964,pop:4.3,cm:2.0,fare:1.6,car:20,fact:'En Roma, cada excavación puede revelar ruinas antiguas.'},
+ {id:'amsterdam',n:'Ámsterdam',c:'NL',lat:52.3676,lng:4.9041,pop:1.2,cm:1.8,fare:3.0,car:24,fact:'El metro de Ámsterdam abrió en 1977, y la ciudad además vive en bici.'},
+ {id:'estambul',n:'Estambul',c:'TR',lat:41.0082,lng:28.9784,pop:15.5,cm:0.9,fare:0.8,car:16,q:1,fact:'Marmaray conecta Europa y Asia bajo el Bósforo.'},
+ {id:'cairo',n:'El Cairo',c:'EG',lat:30.0444,lng:31.2357,pop:21,cm:0.6,fare:0.3,car:18,fact:'El Metro de El Cairo, de 1987, fue el primero de África.'},
+ {id:'nyc',n:'Nueva York',c:'US',lat:40.7128,lng:-74.0060,pop:19,cm:2.4,fare:2.9,car:17,fact:'El subway de Nueva York abrió en 1904.'},
+ {id:'chicago',n:'Chicago',c:'US',lat:41.8781,lng:-87.6298,pop:9,cm:2.0,fare:2.5,car:22,fact:'Los trenes elevados "L" de Chicago funcionan desde 1892.'},
+ {id:'la',n:'Los Ángeles',c:'US',lat:34.0522,lng:-118.2437,pop:13,cm:2.2,fare:1.75,car:28,q:1,fact:'La ciudad del auto: construir transporte público es el gran reto.'},
+ {id:'toronto',n:'Toronto',c:'CA',lat:43.6532,lng:-79.3832,pop:6.2,cm:1.9,fare:2.3,car:23,fact:'El subway de Toronto abrió en 1954.'},
+ {id:'tokio',n:'Tokio',c:'JP',lat:35.6762,lng:139.6503,pop:37,cm:2.1,fare:1.6,car:22,q:1,fact:'La línea Ginza de Tokio (1927) fue el primer metro de Asia.'},
+ {id:'seul',n:'Seúl',c:'KR',lat:37.5665,lng:126.9780,pop:25,cm:1.5,fare:1.0,car:22,fact:'El metro de Seúl abrió en 1974.'},
+ {id:'shanghai',n:'Shanghái',c:'CN',lat:31.2304,lng:121.4737,pop:28,cm:1.0,fare:0.6,car:22,fact:'Su metro abrió en 1993 y hoy es de los más extensos del mundo.'},
+ {id:'singapur',n:'Singapur',c:'SG',lat:1.3521,lng:103.8198,pop:5.9,cm:1.9,fare:1.3,car:30,fact:'El MRT de Singapur opera desde 1987.'},
+ {id:'bombay',n:'Bombay',c:'IN',lat:19.0760,lng:72.8777,pop:21,cm:0.6,fare:0.3,car:15,fact:'Los trenes suburbanos de Bombay llevan millones de personas al día.'},
+ {id:'dubai',n:'Dubái',c:'AE',lat:25.2048,lng:55.2708,pop:3.6,cm:1.8,fare:1.5,car:35,fact:'El Metro de Dubái (2009) funciona sin conductor.'},
+ {id:'sidney',n:'Sídney',c:'AU',lat:-33.8688,lng:151.2093,pop:5.3,cm:2.2,fare:2.5,car:28,fact:'Sydney Metro opera trenes sin conductor.'},
+ {id:'lagos',n:'Lagos',c:'NG',lat:6.5244,lng:3.3792,pop:15,cm:0.6,fare:0.4,car:14,fact:'La Línea Azul de Lagos abrió en 2023.'}
+];
+const CITY={};CITIES.forEach(c=>CITY[c.id]=c);
+
+function lineKm(S,L){let d=0;for(let i=1;i<L.st.length;i++)d+=dist(S.sm[L.st[i-1]],S.sm[L.st[i]]);return d/1000}
+function lineHeadway(S,L){return MODES[L.mode].head/(1+0.22*S.up.freq+0.25*L.lv)}
+function lineCap(S,L){return MODES[L.mode].cap*(1+0.35*S.up.cap)*(1+0.5*L.lv)}
+function lineSpeed(S,L){return MODES[L.mode].speed*(1+0.05*S.up.sig)}
+function segCost(S,mode,a,b){const m=MODES[mode];let k=m.km*S.cm*dist(a,b)/1000;if(m.under){const c=dist({lat:(a.lat+b.lat)/2,lng:(a.lng+b.lng)/2},S.center)/1000;k*=1+0.8*Math.exp(-c/6)}return k*S.dc}
+function stCost(S,mode){return MODES[mode].st*S.cm*S.dc}
+function upgCost(S,u,lvl){return Math.round(u.base*S.cm*S.dc*(1+lvl*0.9))}
+function lineUpCost(S,L){return Math.round(MODES[L.mode].st*2.5*S.cm*S.dc*(1+L.lv)*(1+lineKm(S,L)/10))}
+
+function buildPairs(S){
+ const nd=S.nodes,n=nd.length,I=[],J=[],T=[],D=[];let sum=0;
+ for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const d=dist(nd[i],nd[j])/1000;const g=nd[i].w*nd[j].w/Math.pow(d+2,1.3);I.push(i);J.push(j);D.push(d);T.push(g);sum+=g}
+ for(let k=0;k<T.length;k++)T[k]=sum?T[k]/sum*S.dtot:0;
+ S.pairs={I,J,T,D};
+}
+function hpush(h,x){h.push(x);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p][0]<=h[i][0])break;const t=h[p];h[p]=h[i];h[i]=t;i=p}}
+function hpop(h){const top=h[0],last=h.pop();if(h.length){h[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<h.length&&h[l][0]<h[m][0])m=l;if(r<h.length&&h[r][0]<h[m][0])m=r;if(m===i)break;const t=h[m];h[m]=h[i];h[i]=t;i=m}}return top}
+
+function evaluate(S){
+ const nodes=S.nodes,n=nodes.length,ls=S.lines.filter(l=>l.st.length>=2);
+ const E={riders:0,rev:0,maint:0,cov:0,sat:0,co2:0,km:0,nst:0,xfer:0,lines:{},acc:new Array(n).fill(false),avgT:0,nlines:ls.length,avgF:1};
+ if(!ls.length)return E;
+ const sm=S.sm,states=[],adj=[],byS={},walk={},stM={};
+ ls.forEach((L,li)=>{
+  const m=MODES[L.mode],base=states.length,sp=lineSpeed(S,L);E.km+=lineKm(S,L);
+  L.st.forEach((sid,k)=>{states.push({li});adj.push([]);(byS[sid]=byS[sid]||[]).push(base+k);walk[sid]=Math.max(walk[sid]||0,m.walk);stM[sid]=Math.max(stM[sid]||0,m.sm)});
+  for(let k=0;k<L.st.length-1;k++){const t=dist(sm[L.st[k]],sm[L.st[k+1]])/1000/sp*60+m.dwell;adj[base+k].push([base+k+1,t]);adj[base+k+1].push([base+k,t])}
+ });
+ const sids=Object.keys(byS);E.nst=sids.length;
+ for(const sid of sids){const a=byS[sid];if(new Set(a.map(x=>states[x].li)).size>1){E.xfer++;for(const x of a)for(const y of a)if(states[x].li!==states[y].li)adj[x].push([y,3+lineHeadway(S,ls[states[y].li])/2])}}
+ let totW=0,covW=0;const acc=new Array(n).fill(null);
+ for(let i=0;i<n;i++){const nd=nodes[i];totW+=nd.w;let bd=1e9,bs=null;for(const sid of sids){const d=dist(nd,sm[sid]);if(d<=walk[sid]&&d<bd){bd=d;bs=sid}}if(bs!==null){acc[i]={sid:bs,d:bd};covW+=nd.w;E.acc[i]=true}}
+ E.cov=totW?covW/totW:0;
+ const P=S.pairs,groups={};
+ for(let k=0;k<P.I.length;k++){const a=acc[P.I[k]],b=acc[P.J[k]];if(a&&b)(groups[a.sid]=groups[a.sid]||[]).push(k)}
+ const recs=[],load=ls.map(()=>0),fareF=Math.exp(-0.45*(S.fare/S.cityFare-1));
+ for(const src in groups){
+  const dd=new Float64Array(states.length).fill(Infinity),pv=new Int32Array(states.length).fill(-1),h=[];
+  for(const s of byS[src]){const w=lineHeadway(S,ls[states[s].li])/2;dd[s]=w;hpush(h,[w,s])}
+  while(h.length){const x=hpop(h),d=x[0],u=x[1];if(d>dd[u])continue;for(const e of adj[u]){const nd=d+e[1];if(nd<dd[e[0]]){dd[e[0]]=nd;pv[e[0]]=u;hpush(h,[nd,e[0]])}}}
+  for(const k of groups[src]){
+   const a=acc[P.I[k]],b=acc[P.J[k]];let best=Infinity,bs=-1;
+   for(const s of byS[b.sid]){if(dd[s]<best){best=dd[s];bs=s}}
+   if(bs<0)continue;
+   const used=[];let c=bs;while(c>=0){const li=states[c].li;if(used.indexOf(li)<0)used.push(li);c=pv[c]}
+   const D=P.D[k],tcar=D*1.35/S.car*60+8,ttr=(a.d+b.d)/80+best+3;
+   let sh=1/(1+Math.exp((ttr-tcar)/(0.22*tcar+3)));if(D<2.5)sh*=D/2.5;sh=Math.min(0.7,sh*fareF);
+   const raw=P.T[k]*sh;recs.push([raw,used,D,ttr]);for(const li of used)load[li]+=raw;
+  }
+ }
+ const fac=ls.map((L,li)=>load[li]>0?Math.min(1,lineCap(S,L)/load[li]):1);
+ let tr=0,rawT=0,sumT=0,sumD=0,fm=0;const lr=ls.map(()=>0);
+ for(const r of recs){let f=1,fmm=0;for(const li of r[1]){f=Math.min(f,fac[li]);fmm+=MODES[ls[li].mode].fm}fmm/=r[1].length;const sv=r[0]*f;rawT+=r[0];tr+=sv;sumT+=sv*r[3];sumD+=sv*r[2];fm+=sv*fmm;for(const li of r[1])lr[li]+=sv}
+ const evM=S.ev.reduce((a,e)=>a*(e.mult||1),1),evS=S.ev.reduce((a,e)=>a+(e.sat||0),0);
+ const avgF=rawT>0?tr/rawT:1;E.avgF=avgF;
+ let sat=15+45*E.cov+30*avgF+3*S.up.acc+2.5*S.up.clean+evS-8*Math.max(0,S.fare/S.cityFare-1);sat=Math.max(0,Math.min(100,sat));E.sat=sat;
+ const k=(0.75+0.5*sat/100)*(1+0.04*S.up.app+0.02*S.up.acc)*evM;
+ E.riders=tr*k;E.avgT=tr?sumT/tr:0;
+ E.rev=fm*k*S.fare*30/1000*3+E.nst*S.up.ads*6*S.cm;
+ E.co2=sumD*k*0.17*(1+0.05*S.up.energy)/1000;
+ let mt=0;ls.forEach(L=>{mt+=lineKm(S,L)*MODES[L.mode].mt});for(const sid of sids)mt+=stM[sid];
+ E.maint=mt*S.cm*(1-0.07*S.up.energy);
+ ls.forEach((L,li)=>{E.lines[L.id]={riders:lr[li]*k,load:load[li]*k,cap:lineCap(S,L)}});
+ return E;
+}
+function statsOf(S,E){return{estaciones:E.nst,lineas:E.nlines,km:Math.round(E.km*10)/10,pasajeros:Math.round(E.riders),cobertura:Math.round(E.cov*100),correspondencias:E.xfer,satisfaccion:Math.round(E.sat),logros:Object.keys(S.ach).length,co2:Math.round(E.co2),mes:S.month,dinero:Math.round(S.money)}}
+function scoreOf(s){return Math.round(s.pasajeros*0.4+s.estaciones*100+s.km*250+s.lineas*400+s.cobertura*6+s.correspondencias*150+s.satisfaccion*8+s.logros*500+s.co2*5)}
+function levelOf(p){return Math.floor(Math.sqrt(p/400))+1}
+//#SIM-END
+
+const LEVELS=['Aprendiz de planificación','Planificador','Ingeniero de tránsito','Director de metro','Secretario de movilidad','Alcalde visionario','Leyenda del transporte'];
+const PAL=['#e4002b','#0072ce','#00a651','#ffb703','#8e44ad','#ff7f00','#00b5cc','#e91e8c','#795548','#6d7b8d','#9acd32','#00695c'];
+const KINDS={suburb:'Colonia',neighbourhood:'Barrio',quarter:'Distrito',town:'Pueblo',village:'Poblado',city_block:'Manzana',university:'Universidad',college:'Colegio',hospital:'Hospital',mall:'Centro comercial',stadium:'Estadio',aerodrome:'Aeropuerto',station:'Estación ferroviaria',attraction:'Atractivo turístico',marketplace:'Mercado',zona:'Zona'};
+const KW={suburb:55,neighbourhood:30,quarter:35,town:45,village:12,city_block:20,university:45,college:25,hospital:28,mall:35,stadium:30,aerodrome:60,station:22,attraction:14,marketplace:16};
+
+const EVENTS=[
+ {id:'rain',t:'🌧 Lluvias intensas: más gente deja el auto.',left:2,mult:1.08},
+ {id:'match',t:'⚽ Partido importante: viaje masivo de aficionados.',left:1,mult:1.05,cash:600},
+ {id:'strike',t:'✊ Paro sindical: servicio reducido.',left:2,mult:0.8,sat:-8,bad:1},
+ {id:'concert',t:'🎤 Concierto masivo: la gente usa el transporte.',left:1,mult:1.04,cash:500},
+ {id:'power',t:'⚡ Falla eléctrica: reparaciones urgentes.',left:1,mult:0.93,sat:-6,cash:-800,bad:1},
+ {id:'subsidy',t:'🏛 Subsidio federal para transporte público.',left:0,cash:6000},
+ {id:'fair',t:'🎡 Feria turística: más usuarios.',left:3,mult:1.1},
+ {id:'quake',t:'🌋 Sismo: inspección de túneles y estaciones.',left:1,mult:0.9,sat:-5,cash:-2500,bad:1,only:'q'},
+ {id:'fuel',t:'⛽ Gasolina cara: más gente prefiere el transporte público.',left:3,mult:1.12},
+ {id:'viral',t:'📱 Tu red se vuelve viral en redes sociales.',left:2,mult:1.06},
+ {id:'flood',t:'🌊 Inundación en una zona baja de la red.',left:1,mult:0.92,sat:-4,cash:-1200,bad:1},
+ {id:'heat',t:'🔥 Ola de calor: fallas de aire acondicionado.',left:2,sat:-5,bad:1},
+ {id:'bike',t:'🚲 Campaña de bicis y caminar: ahorro en el sistema.',left:0,cash:1500}
+];
+const ACH=[
+ {id:'first',n:'Primera piedra',d:'Coloca tu primera estación',f:(S,E)=>S.stations.length>=1,r:300},
+ {id:'line1',n:'Primera línea',d:'Conecta 2 estaciones',f:(S,E)=>E.nlines>=1,r:600},
+ {id:'st10',n:'Red naciente',d:'10 estaciones en servicio',f:(S,E)=>E.nst>=10,r:1000},
+ {id:'st30',n:'Red en crecimiento',d:'30 estaciones en servicio',f:(S,E)=>E.nst>=30,r:3000},
+ {id:'st100',n:'Metrópolis',d:'100 estaciones en servicio',f:(S,E)=>E.nst>=100,r:12000},
+ {id:'km10',n:'10 km de red',d:'Construye 10 km',f:(S,E)=>E.km>=10,r:1000},
+ {id:'km50',n:'50 km de red',d:'Construye 50 km',f:(S,E)=>E.km>=50,r:5000},
+ {id:'km150',n:'150 km de red',d:'Construye 150 km',f:(S,E)=>E.km>=150,r:20000},
+ {id:'r10k',n:'Diez mil al día',d:'10,000 pasajeros/día',f:(S,E)=>E.riders>=1e4,r:1500},
+ {id:'r100k',n:'Cien mil al día',d:'100,000 pasajeros/día',f:(S,E)=>E.riders>=1e5,r:6000},
+ {id:'r500k',n:'Medio millón',d:'500,000 pasajeros/día',f:(S,E)=>E.riders>=5e5,r:20000},
+ {id:'r2m',n:'Dos millones',d:'2,000,000 pasajeros/día',f:(S,E)=>E.riders>=2e6,r:60000},
+ {id:'cov25',n:'Un cuarto de ciudad',d:'25% de cobertura',f:(S,E)=>E.cov>=0.25,r:1500},
+ {id:'cov50',n:'Media ciudad',d:'50% de cobertura',f:(S,E)=>E.cov>=0.5,r:5000},
+ {id:'cov80',n:'Ciudad conectada',d:'80% de cobertura',f:(S,E)=>E.cov>=0.8,r:15000},
+ {id:'modes3',n:'Multimodal',d:'Usa 3 tipos de transporte distintos',f:(S,E)=>new Set(S.lines.filter(l=>l.st.length>=2).map(l=>l.mode)).size>=3,r:3000},
+ {id:'modes6',n:'Todo terreno',d:'Usa los 6 tipos de transporte',f:(S,E)=>new Set(S.lines.filter(l=>l.st.length>=2).map(l=>l.mode)).size>=6,r:15000},
+ {id:'x3',n:'Nodo de transbordo',d:'3 correspondencias',f:(S,E)=>E.xfer>=3,r:2000},
+ {id:'x10',n:'Cerebro de la red',d:'10 correspondencias',f:(S,E)=>E.xfer>=10,r:8000},
+ {id:'sat80',n:'Usuarios felices',d:'Satisfacción de 80 o más',f:(S,E)=>E.sat>=80&&E.nlines>0,r:4000},
+ {id:'l5',n:'Cinco líneas',d:'Ten 5 líneas activas',f:(S,E)=>E.nlines>=5,r:5000},
+ {id:'cable',n:'Rumbo a las alturas',d:'Construye un teleférico',f:(S,E)=>S.lines.some(l=>l.mode==='cable'&&l.st.length>=2),r:2000},
+ {id:'co2a',n:'Aire más limpio',d:'Evita 100 t de CO₂ al día',f:(S,E)=>E.co2>=100,r:3000},
+ {id:'co2b',n:'Ciudad verde',d:'Evita 1,000 t de CO₂ al día',f:(S,E)=>E.co2>=1000,r:15000},
+ {id:'upg10',n:'Modernizador',d:'Suma 10 niveles de mejoras',f:(S,E)=>Object.values(S.up).reduce((a,b)=>a+b,0)>=10,r:4000}
+];
+
+/* ---------- Estado ---------- */
+let S=null,E=null,map=null,dirty=false,timer=null,evalT=null,prevRiders=0;
+let UI={tool:'explore',lineId:null,end:'end',speed:1,demand:true,cover:false,trains:true,labels:true,tab:null,base:'osm',undo:null};
+let gDemand,gCover,gLines,gSt,gTrain,baseLayer;
+const Cloud={url:'',user:'',pin:'',on:false,parts:{},busy:false,last:0,score:null,lastErr:''};
+
+/* ---------- Utilidades UI ---------- */
+function fmt(k){if(S&&S.diff==='sandbox')return '∞';const a=Math.abs(k),s=k<0?'−':'';if(a>=1e6)return s+'$'+(a/1e6).toFixed(2)+' B';if(a>=1e3)return s+'$'+(a/1e3).toFixed(1)+' M';return s+'$'+Math.round(a)+' k'}
+function fmtN(n){return Math.round(n).toLocaleString('es-MX')}
+let toastT;function toast(m,ms){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',ms||2600)}
+function modal(h){$('mcard').innerHTML=h;$('modal').classList.add('show')}
+function closeModal(){$('modal').classList.remove('show')}
+function showLoading(m){modal(`<div class="spin"></div><p style="text-align:center">${esc(m)}</p>`)}
+function canPay(c){return S.diff==='sandbox'||S.money>=c}
+function pay(c){if(S.diff!=='sandbox')S.money-=c}
+function news(t){S.log.unshift(`Mes ${S.month}: ${t}`);S.log=S.log.slice(0,20)}
+
+/* ---------- Mapa ---------- */
+const BASES={
+ osm:{u:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',a:'© OpenStreetMap',o:{maxZoom:19}},
+ light:{u:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',a:'© OpenStreetMap © CARTO',o:{maxZoom:19,subdomains:'abcd'}},
+ dark:{u:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',a:'© OpenStreetMap © CARTO',o:{maxZoom:19,subdomains:'abcd'}}
+};
+function setBase(k){UI.base=k;if(!map)return;if(baseLayer)map.removeLayer(baseLayer);const b=BASES[k];baseLayer=L.tileLayer(b.u,Object.assign({attribution:b.a},b.o)).addTo(map);baseLayer.bringToBack()}
+function initMap(){
+ if(map)return;
+ map=L.map('map',{zoomControl:false,preferCanvas:true,minZoom:9});
+ L.control.zoom({position:'topright'}).addTo(map);
+ [['pDemand',405],['pCover',406],['pLines',420],['pSt',430],['pTrain',440]].forEach(p=>{map.createPane(p[0]).style.zIndex=p[1];map.getPane(p[0]).style.pointerEvents='none'});
+ setBase(UI.base);
+ gDemand=L.layerGroup().addTo(map);gCover=L.layerGroup().addTo(map);gLines=L.layerGroup().addTo(map);gSt=L.layerGroup().addTo(map);gTrain=L.layerGroup().addTo(map);
+ map.on('click',onMapClick);
+ map.on('zoomend',()=>{if(S)drawNetwork()});
+ requestAnimationFrame(animate);
+}
+function drawDemand(){
+ gDemand.clearLayers();if(!UI.demand||!S)return;
+ S.nodes.forEach((nd,i)=>{const ok=E&&E.acc[i];L.circle([nd.lat,nd.lng],{pane:'pDemand',interactive:false,radius:140+Math.sqrt(nd.w)*34,stroke:false,fillColor:ok?'#2ecc71':'#ff8a00',fillOpacity:ok?0.16:0.34}).addTo(gDemand)});
+}
+let trainData=[];
+function drawNetwork(){
+ gLines.clearLayers();gSt.clearLayers();gTrain.clearLayers();gCover.clearLayers();trainData=[];
+ if(!S)return;
+ const where={};
+ S.lines.forEach(Ln=>{
+  const pts=Ln.st.map(id=>S.sm[id]).filter(Boolean).map(s=>[s.lat,s.lng]);if(pts.length<2)return;
+  const m=MODES[Ln.mode];
+  L.polyline(pts,{pane:'pLines',interactive:false,color:'#0a0f1a',weight:m.w+4,opacity:0.75,lineCap:'round'}).addTo(gLines);
+  L.polyline(pts,{pane:'pLines',interactive:false,color:Ln.color,weight:m.w,opacity:1,dashArray:m.dash,lineCap:m.dash&&Ln.mode==='cable'?'round':'butt'}).addTo(gLines);
+  Ln.st.forEach(id=>{(where[id]=where[id]||[]).push(Ln)});
+  if(UI.trains&&UI.speed>0){
+   const sts=Ln.st.map(id=>S.sm[id]);const cum=[0];for(let i=1;i<sts.length;i++)cum.push(cum[i-1]+dist(sts[i-1],sts[i]));
+   const len=cum[cum.length-1],sp=lineSpeed(S,Ln),hd=lineHeadway(S,Ln),n=Math.max(1,Math.min(8,Math.round(len/1000/(sp*hd/60))));
+   for(let k=0;k<n;k++){const mk=L.circleMarker([sts[0].lat,sts[0].lng],{pane:'pTrain',interactive:false,radius:4,color:Ln.color,weight:2,fillColor:'#fff',fillOpacity:1}).addTo(gTrain);trainData.push({sts,cum,len,k,n,sp,mk})}
+  }
+ });
+ const showLab=UI.labels&&map.getZoom()>=15;
+ S.stations.forEach(s=>{
+  const ls=where[s.id]||[];
+  const mk=L.circleMarker([s.lat,s.lng],{pane:'pSt',interactive:false,radius:ls.length>1?8:ls.length?6:4,color:ls.length?'#111':'#666',weight:ls.length>1?3:2,fillColor:ls.length>1?'#fff':ls.length?ls[0].color:'#999',fillOpacity:1}).addTo(gSt);
+  if(showLab&&ls.length)mk.bindTooltip(esc(s.name),{permanent:true,direction:'right',offset:[8,0],opacity:0.85});
+  if(UI.cover&&ls.length){const r=Math.max.apply(null,ls.map(l=>MODES[l.mode].walk));L.circle([s.lat,s.lng],{pane:'pCover',interactive:false,radius:r,color:ls[0].color,weight:1,fillColor:ls[0].color,fillOpacity:0.12}).addTo(gCover)}
+ });
+}
+let lastA=0;
+function animate(ts){
+ requestAnimationFrame(animate);if(ts-lastA<60||!trainData.length)return;lastA=ts;
+ const sec=ts/1000;
+ for(const t of trainData){
+  const v=t.sp/3.6*40;let d=(sec*v+t.k*t.len*2/t.n)%(t.len*2);if(d>t.len)d=2*t.len-d;
+  let i=1;while(i<t.cum.length-1&&t.cum[i]<d)i++;
+  const a=t.sts[i-1],b=t.sts[i],f=(d-t.cum[i-1])/((t.cum[i]-t.cum[i-1])||1);
+  t.mk.setLatLng([a.lat+(b.lat-a.lat)*f,a.lng+(b.lng-a.lng)*f]);
+ }
+}
+
+/* ---------- Interacción en el mapa ---------- */
+function nearestStation(ll,px){let best=null,bd=px;const p=map.latLngToContainerPoint(ll);for(const s of S.stations){const q=map.latLngToContainerPoint([s.lat,s.lng]),d=Math.hypot(p.x-q.x,p.y-q.y);if(d<bd){bd=d;best=s}}return best}
+function nearestNode(ll,maxM){let b=null,bd=maxM;for(const n of S.nodes){const d=dist(ll,n);if(d<bd){bd=d;b=n}}return b}
+function nameFor(ll){
+ const nd=nearestNode(ll,900);let base=nd&&nd.name?nd.name:'Estación';
+ const taken=new Set(S.stations.map(s=>s.name));let nm=base,k=2;
+ while(taken.has(nm)){nm=base+' '+k;k++}
+ return nm;
+}
+function onMapClick(e){
+ if(!S)return;const ll=e.latlng;
+ if(UI.tool==='build')return buildAt(ll);
+ const st=nearestStation(ll,26);
+ if(UI.tool==='demolish'){if(st)demolishStation(st.id);else toast('Toca una estación para demolerla');return}
+ if(st){
+  const ls=S.lines.filter(l=>l.st.includes(st.id));
+  L.popup().setLatLng([st.lat,st.lng]).setContent(`<div class="pop"><b>${esc(st.name)}</b><br>${ls.length?ls.map(l=>`<span style="color:${l.color}">●</span> ${esc(l.name)}`).join('<br>'):'<i>Sin servicio</i>'}<br><button onclick="renameStation(${st.id})">✏ Renombrar</button><button onclick="demolishStation(${st.id})">🗑 Demoler</button></div>`).openOn(map);
+ }else{
+  const nd=nearestNode(ll,600);
+  if(nd){const hab=Math.round(nd.w/S.totW*CITY[S.city].pop*1e6*0.8/1000)*1000;const i=S.nodes.indexOf(nd);
+   L.popup().setLatLng([nd.lat,nd.lng]).setContent(`<div class="pop"><b>${esc(nd.name||KINDS[nd.k])}</b><br>${KINDS[nd.k]||''} · ~${fmtN(hab)} personas<br>${E&&E.acc[i]?'✅ Con servicio cercano':'🟠 Sin servicio de transporte'}</div>`).openOn(map)}
+ }
+}
+function buildAt(ll){
+ const Ln=S.lines.find(l=>l.id===UI.lineId);
+ if(!Ln){toast('Primero crea o elige una línea');openNewLine();return}
+ const m=MODES[Ln.mode];
+ let st=nearestStation(ll,28),isNew=false;
+ if(!st){let near=null,nd=1e9;for(const s of S.stations){const d=dist(ll,s);if(d<nd){nd=d;near=s}}if(near&&nd<m.gap)st=near;else isNew=true}
+ const arr=Ln.st,atEnd=UI.end==='end';
+ if(st&&arr.includes(st.id)){toast('Esa estación ya está en la línea');return}
+ const tgt=st||{lat:ll.lat,lng:ll.lng};
+ const ref=arr.length?S.sm[atEnd?arr[arr.length-1]:arr[0]]:null;
+ let cost=0;
+ if(ref){const d=dist(ref,tgt);if(d>m.maxSeg){toast(`Tramo muy largo (máx ${(m.maxSeg/1000).toFixed(1)} km en ${m.n})`);return}if(d<m.gap*0.7){toast('Muy cerca de la estación anterior');return}cost+=segCost(S,Ln.mode,ref,tgt)}
+ cost+=isNew?stCost(S,Ln.mode):stCost(S,Ln.mode)*0.4;
+ if(!canPay(cost)){toast('Fondos insuficientes: necesitas '+fmt(cost));return}
+ if(isNew){st={id:S.nid++,lat:ll.lat,lng:ll.lng,name:nameFor(ll)};S.stations.push(st);S.sm[st.id]=st}
+ pay(cost);if(atEnd)arr.push(st.id);else arr.unshift(st.id);
+ UI.undo={lineId:Ln.id,sid:st.id,isNew,cost};
+ prevRiders=E?E.riders:0;
+ markDirty(true);
+ toast(`${m.i} ${esc(st.name)} · −${fmt(cost)}`,1400);
+}
+function undo(){
+ const u=UI.undo;if(!u){toast('Nada que deshacer');return}
+ const Ln=S.lines.find(l=>l.id===u.lineId);
+ if(Ln){const i=Ln.st.indexOf(u.sid);if(i>=0)Ln.st.splice(i,1)}
+ if(u.isNew){S.stations=S.stations.filter(s=>s.id!==u.sid);delete S.sm[u.sid]}
+ if(S.diff!=='sandbox')S.money+=u.cost;UI.undo=null;markDirty(true);toast('Construcción deshecha (reembolso total)');
+}
+function demolishStation(id){
+ const s=S.sm[id];if(!s)return;map.closePopup();
+ let mx=0;S.lines.forEach(l=>{if(l.st.includes(id))mx=Math.max(mx,stCost(S,l.mode))});
+ S.lines.forEach(l=>{l.st=l.st.filter(x=>x!==id)});S.lines=S.lines.filter(l=>l.st.length>0||l.id===UI.lineId);
+ S.stations=S.stations.filter(x=>x.id!==id);delete S.sm[id];
+ if(S.diff!=='sandbox')S.money+=mx*0.3;UI.undo=null;markDirty(true);toast('🗑 Estación demolida (reembolso 30%)');
+}
+function renameStation(id){const s=S.sm[id];if(!s)return;const n=prompt('Nuevo nombre de la estación',s.name);if(n&&n.trim()){s.name=n.trim().slice(0,40);drawNetwork();map.closePopup()}}
+
+/* ---------- Líneas ---------- */
+function openNewLine(){
+ let h='<h2>Nueva línea</h2><p class="muted">Elige el tipo de transporte. Los costos ya incluyen la ciudad y la dificultad.</p><div class="cards">';
+ for(const k in MODES){const m=MODES[k];h+=`<button class="mode" onclick="createLine('${k}')"><span class="ic">${m.i}</span><span><b>${m.n}</b><br><span class="muted">${fmt(m.st*S.cm*S.dc)}/estación · ${fmt(m.km*S.cm*S.dc)}/km · ${m.speed} km/h · ${fmtN(m.cap)} pas/día</span></span></button>`}
+ h+='</div><p style="text-align:right;margin-bottom:0"><button onclick="closeModal()">Cancelar</button></p>';modal(h);
+}
+function createLine(mode){
+ closeModal();const id=S.lid++;
+ S.lines.push({id,name:`${MODES[mode].pre} ${id}`,color:PAL[(id-1)%PAL.length],mode,lv:0,st:[]});
+ UI.lineId=id;setTool('build');markDirty(true);toast(`${MODES[mode].i} Línea creada. Toca el mapa para colocar estaciones.`,3200);
+}
+function selectLine(id){UI.lineId=id;setTool('build');openTab(null)}
+function renameLine(id){const l=S.lines.find(x=>x.id===id);const n=prompt('Nombre de la línea',l.name);if(n&&n.trim()){l.name=n.trim().slice(0,30);renderAll()}}
+function upgradeLine(id){
+ const l=S.lines.find(x=>x.id===id);if(l.lv>=4){toast('Nivel máximo de línea');return}
+ const c=lineUpCost(S,l);if(!canPay(c)){toast('Fondos insuficientes: '+fmt(c));return}
+ pay(c);l.lv++;markDirty(false);toast(`${l.name}: más trenes (nivel ${l.lv})`);
+}
+function deleteLine(id){
+ const l=S.lines.find(x=>x.id===id);if(!confirm(`¿Eliminar ${l.name}? Recuperas el 30% del costo de los tramos.`))return;
+ let ref=0;for(let i=1;i<l.st.length;i++)ref+=segCost(S,l.mode,S.sm[l.st[i-1]],S.sm[l.st[i]])*0.3;
+ if(S.diff!=='sandbox')S.money+=ref;S.lines=S.lines.filter(x=>x.id!==id);if(UI.lineId===id)UI.lineId=S.lines.length?S.lines[0].id:null;UI.undo=null;markDirty(true);
+}
+function renderLinebar(){
+ const bar=$('linebar');if(UI.tool!=='build'||!S){bar.className='';bar.innerHTML='';return}
+ const Ln=S.lines.find(l=>l.id===UI.lineId);
+ bar.className='show';
+ bar.innerHTML=(Ln?`<button onclick="openTab('lines')"><span style="color:${Ln.color}">●</span> ${esc(Ln.name)} ${MODES[Ln.mode].i} ▾</button>`:'')+`<button class="pri" onclick="openNewLine()">＋ Nueva línea</button>`+(Ln?`<button onclick="toggleEnd()">Extender: ${UI.end==='end'?'final ➜':'⬅ inicio'}</button>`:'');
+}
+function toggleEnd(){UI.end=UI.end==='end'?'start':'end';renderLinebar()}
+
+/* ---------- Herramientas, velocidad ---------- */
+function setTool(t){UI.tool=t;['Explore','Build','Demo'].forEach(x=>$('t'+x).classList.toggle('on',({Explore:'explore',Build:'build',Demo:'demolish'})[x]===t));renderLinebar();if(map)map.closePopup();
+ if(t==='build'&&S&&!S.lines.length)openNewLine()}
+function setSpeed(n){UI.speed=n;[0,1,2,3].forEach(i=>$('s'+i).classList.toggle('on',i===n));startTimer();if(S)drawNetwork()}
+function startTimer(){clearInterval(timer);timer=null;const ms=[0,3500,1500,600][UI.speed];if(ms&&S)timer=setInterval(tick,ms)}
+
+/* ---------- Economía / tick ---------- */
+function markDirty(redraw){dirty=true;if(redraw)drawNetwork();clearTimeout(evalT);evalT=setTimeout(evalNow,120);updateTop()}
+function evalNow(){
+ if(!S)return;E=evaluate(S);dirty=false;drawDemand();checkAch();renderAll();
+ if(prevRiders!==null&&E.riders>prevRiders+50){toast(`📈 +${fmtN(E.riders-prevRiders)} pasajeros/día`,1800)}prevRiders=null;
+}
+function checkAch(){
+ for(const a of ACH){if(!S.ach[a.id]&&a.f(S,E)){S.ach[a.id]=1;const r=a.r*S.cm;if(S.diff!=='sandbox')S.money+=r;news(`🏆 ${a.n}`);toast(`🏆 ${a.n} · +${fmt(r)}`,3500)}}
+}
+function tick(){
+ if(!S)return;if(dirty)evalNow();
+ S.month++;
+ if(S.diff!=='sandbox')S.money+=E.rev-E.maint;
+ let changed=false;
+ for(const e of S.ev){e.left--}
+ if(S.ev.some(e=>e.left<=0)){S.ev=S.ev.filter(e=>e.left>0);changed=true}
+ if(S.stations.length>2&&Math.random()<0.13*DIFF[S.diff].ev){
+  const cityQ=CITY[S.city].q;const pool=EVENTS.filter(e=>(!e.only||cityQ)&&!S.ev.some(x=>x.id===e.id));
+  const ev=pool[Math.floor(Math.random()*pool.length)];
+  if(ev){if(ev.cash&&S.diff!=='sandbox')S.money+=ev.cash*S.cm;if(ev.left>0){S.ev.push({id:ev.id,left:ev.left,mult:ev.mult,sat:ev.sat,t:ev.t});changed=true}news(ev.t);toast(ev.t,3800)}
+ }
+ if(S.diff!=='sandbox'&&S.money<-40000*S.cm){S.money=15000*S.cm;S.rescues=(S.rescues||0)+1;news('🏦 Rescate financiero del gobierno');toast('🏦 Rescate financiero: el gobierno te inyecta fondos',4000)}
+ if(changed)dirty=true;
+ if(S.month%6===0)news(`Ingresos ${fmt(E.rev)} · Mantenimiento ${fmt(E.maint)}`);
+ if(dirty)evalNow();else{checkAch();renderAll()}
+ if(S.month%3===0)saveLocal();
+ if(S.month%10===0)cloudSave(false);
+}
+
+/* ---------- Render UI ---------- */
+function updateTop(){
+ if(!S)return;const st=E?statsOf(S,E):null;const sc=st?scoreOf(st):0;
+ $('cityname').textContent=CITY[S.city].n;
+ $('cMoney').textContent='💰 '+fmt(S.money);$('cMoney').className='chip '+(S.money<0?'r':'');
+ $('cMonth').textContent='📅 Mes '+S.month;
+ $('cRiders').textContent='👥 '+(E?fmtN(E.riders):0);
+ const net=E?E.rev-E.maint:0;$('cNet').textContent=(net>=0?'+':'')+fmt(net).replace('$','$')+'/mes';$('cNet').className='chip '+(net>=0?'g':'r');
+ $('cScore').textContent='⭐ '+fmtN(sc);
+ $('cSat').textContent='🙂 '+(E?Math.round(E.sat):0);
+ $('cLvl').textContent='Nv '+levelOf(sc);
+ $('events').innerHTML=S.ev.map(e=>`<div class="ev">${esc(e.t)}</div>`).join('');
+}
+function openTab(t){UI.tab=(UI.tab===t&&t)?null:t;renderSheet()}
+function renderAll(){updateTop();renderSheet();renderLinebar()}
+function renderSheet(){
+ const sh=$('sheet');if(!UI.tab||!S){sh.className='';return}
+ sh.className='show';
+ const tabs=`<div class="tabs"><button class="${UI.tab==='lines'?'on':''}" onclick="UI.tab='lines';renderSheet()">🚇 Líneas</button><button class="${UI.tab==='up'?'on':''}" onclick="UI.tab='up';renderSheet()">⬆ Mejoras</button><button class="${UI.tab==='goals'?'on':''}" onclick="UI.tab='goals';renderSheet()">🏆 Metas</button><button class="${UI.tab==='more'?'on':''}" onclick="UI.tab='more';renderSheet()">⚙ Más</button><button onclick="UI.tab=null;renderSheet()" style="margin-left:auto">✕</button></div>`;
+ const keep=sh.scrollTop;
+ sh.innerHTML=tabs+({lines:panelLines,up:panelUp,goals:panelGoals,more:panelMore})[UI.tab]();sh.scrollTop=keep;
+}
+function panelLines(){
+ let h='<div class="ph"><b>Tus líneas</b><button class="pri" onclick="openNewLine()">＋ Nueva</button></div>';
+ if(!S.lines.length)h+='<p class="muted">Aún no tienes líneas. Crea una y toca el mapa para colocar estaciones. Empieza con autobuses: son baratos y te dan ingresos para crecer.</p>';
+ for(const Ln of S.lines){
+  const ls=E&&E.lines[Ln.id],km=lineKm(S,Ln),pct=ls?Math.min(100,ls.load/ls.cap*100):0;
+  h+=`<div class="row"><span class="dot" style="background:${Ln.color}"></span><div class="grow"><b>${esc(Ln.name)}</b> ${MODES[Ln.mode].i}${Ln.id===UI.lineId?' <span class="muted">(activa)</span>':''}<div class="muted">${Ln.st.length} est. · ${km.toFixed(1)} km · ${ls?fmtN(ls.riders):0} pas/día · trenes nv ${Ln.lv}</div><div class="bar"><i class="${ls&&ls.load>ls.cap?'red':''}" style="width:${pct}%"></i></div></div><div class="col"><button onclick="selectLine(${Ln.id})">🔨</button><button onclick="upgradeLine(${Ln.id})" title="${fmt(lineUpCost(S,Ln))}">⬆ ${fmt(lineUpCost(S,Ln))}</button><button onclick="renameLine(${Ln.id})">✏</button><button onclick="deleteLine(${Ln.id})">🗑</button></div></div>`;
+ }
+ return h+'<p class="muted">🔨 construir en la línea · ⬆ más trenes (capacidad y frecuencia). Barra roja = línea saturada.</p>';
+}
+function buyUp(id){const u=UPG.find(x=>x.id===id),l=S.up[id];if(l>=u.max)return;const c=upgCost(S,u,l);if(!canPay(c)){toast('Fondos insuficientes: '+fmt(c));return}pay(c);S.up[id]++;toast(`${u.i} ${u.n} nivel ${S.up[id]}`);markDirty(false)}
+function setFare(v){S.fare=Math.round(v*100)/100;markDirty(false)}
+function panelUp(){
+ const cf=S.cityFare;
+ let h=`<div class="ph"><b>Tarifa</b><span>$${S.fare.toFixed(2)} <span class="muted">(ref. $${cf.toFixed(2)})</span></span></div><input type="range" min="${(cf*0.2).toFixed(2)}" max="${(cf*3).toFixed(2)}" step="0.05" value="${S.fare}" onchange="setFare(this.value)"><p class="muted">Más cara = más ingresos por viaje pero menos usuarios y menos satisfacción.</p><div class="ph" style="margin-top:12px"><b>Mejoras de la red</b></div>`;
+ for(const u of UPG){const l=S.up[u.id],mx=l>=u.max;h+=`<div class="row"><span style="font-size:24px">${u.i}</span><div class="grow"><b>${u.n}</b> <span class="muted">nv ${l}/${u.max}</span><div class="muted">${u.d}</div></div><button ${mx?'disabled':''} onclick="buyUp('${u.id}')">${mx?'MAX':fmt(upgCost(S,u,l))}</button></div>`}
+ return h;
+}
+function panelGoals(){
+ const done=ACH.filter(a=>S.ach[a.id]).length,next=ACH.find(a=>!S.ach[a.id]);
+ let h=`<div class="ph"><b>Metas · ${done}/${ACH.length}</b>${Cloud.on?'<button onclick="showRanking()">🏅 Ranking</button>':''}</div>`;
+ if(next)h+=`<div class="row" style="border:1px solid var(--acc)"><span style="font-size:22px">🎯</span><div class="grow"><b>${next.n}</b><div class="muted">${next.d}</div></div><span class="chip">+${fmt(next.r*S.cm)}</span></div>`;
+ for(const a of ACH)h+=`<div class="row" style="opacity:${S.ach[a.id]?1:0.55}"><span>${S.ach[a.id]?'✅':'⬜'}</span><div class="grow"><b>${a.n}</b><div class="muted">${a.d}</div></div><span class="muted">+${fmt(a.r*S.cm)}</span></div>`;
+ return h;
+}
+function panelMore(){
+ const st=statsOf(S,E),sc=scoreOf(st),lv=levelOf(sc),city=CITY[S.city];
+ let h=`<div class="kv"><div>Puntaje<b>${fmtN(sc)}</b></div><div>Nivel ${lv}<b style="font-size:13px">${LEVELS[Math.min(LEVELS.length-1,lv-1)]}</b></div><div>Cobertura<b>${st.cobertura}%</b></div><div>Satisfacción<b>${st.satisfaccion}/100</b></div><div>Red<b>${st.km} km · ${st.estaciones} est.</b></div><div>Transbordos<b>${st.correspondencias}</b></div><div>CO₂ evitado<b>${fmtN(st.co2)} t/día</b></div><div>Viaje medio<b>${E.avgT?Math.round(E.avgT)+' min':'—'}</b></div><div>Ingresos<b>${fmt(E.rev)}/mes</b></div><div>Mantenimiento<b>${fmt(E.maint)}/mes</b></div></div>`;
+ h+=`<p class="muted">Puntaje = pasajeros×0.4 + estaciones×100 + km×250 + líneas×400 + cobertura%×6 + transbordos×150 + satisfacción×8 + logros×500 + CO₂×5.${Cloud.on?`<br>☁ Puntaje en tu Google Sheet: <b>${Cloud.score!=null?fmtN(Cloud.score):'—'}</b> ${Cloud.last?'(sincronizado '+new Date(Cloud.last).toLocaleTimeString()+')':''}`:''}</p>`;
+ h+=`<div class="ph"><b>Capas del mapa</b></div>`;
+ [['demand','Demanda (🟠 sin servicio · 🟢 cubierta)'],['cover','Radio de caminata de estaciones'],['trains','Trenes animados'],['labels','Nombres de estaciones (zoom cercano)']].forEach(([k,t])=>{h+=`<label class="sw"><input type="checkbox" ${UI[k]?'checked':''} onchange="UI['${k}']=this.checked;drawDemand();drawNetwork()"> ${t}</label>`});
+ h+=`<div class="ph" style="margin-top:8px"><b>Mapa base</b></div><select onchange="setBase(this.value)"><option value="osm" ${UI.base==='osm'?'selected':''}>OpenStreetMap</option><option value="light" ${UI.base==='light'?'selected':''}>Claro (CARTO)</option><option value="dark" ${UI.base==='dark'?'selected':''}>Oscuro (CARTO)</option></select>`;
+ h+=`<div class="ph" style="margin-top:12px"><b>Noticias</b></div>`+(S.log.length?S.log.slice(0,8).map(x=>`<div class="muted">• ${esc(x)}</div>`).join(''):'<div class="muted">Sin novedades.</div>');
+ h+=`<div class="ph" style="margin-top:12px"><b>Cuenta: ${esc(Cloud.user||'sin cuenta')}</b></div><div class="grid"><button class="pri" onclick="manualSave()">💾 Guardar ahora</button><button onclick="cityMenu()">🌎 Cambiar ciudad</button><button onclick="helpModal()">❓ Cómo jugar</button><button onclick="logout()">🚪 Salir</button></div>`;
+ return h;
+}
+
+/* ---------- Guardado compacto ---------- */
+function serialize(S){
+ const names=[],ix=new Map(),nm=s=>{s=s||'';if(!ix.has(s)){ix.set(s,names.length);names.push(s)}return ix.get(s)};
+ let a=0,b=0;const st=[];
+ for(const s of S.stations){const la=Math.round(s.lat*1e5),lo=Math.round(s.lng*1e5);st.push(s.id,la-a,lo-b,nm(s.name));a=la;b=lo}
+ a=0;b=0;const nd=[];
+ for(const n of S.nodes){const la=Math.round(n.lat*1e5),lo=Math.round(n.lng*1e5);nd.push(la-a,lo-b,Math.round(n.w*10),n.k,nm(n.name));a=la;b=lo}
+ return{v:1,ts:Date.now(),c:S.city,d:S.diff,mo:S.month,m:Math.round(S.money),f:S.fare,u:S.up,a:Object.keys(S.ach),ni:S.nid,li:S.lid,nm:names,st,nd,ln:S.lines.map(l=>[l.id,l.name,l.color,l.mode,l.lv,l.st]),ev:S.ev,lg:S.log.slice(0,15),rs:S.rescues||0};
+}
+function deserialize(o){
+ const S={v:1,city:o.c,diff:o.d,month:o.mo,money:o.m,fare:o.f,up:o.u,ach:{},ev:o.ev||[],log:o.lg||[],nid:o.ni,lid:o.li,stations:[],lines:[],nodes:[],rescues:o.rs||0};
+ o.a.forEach(k=>S.ach[k]=1);UPG.forEach(u=>{if(S.up[u.id]==null)S.up[u.id]=0});
+ let a=0,b=0;for(let i=0;i<o.st.length;i+=4){a+=o.st[i+1];b+=o.st[i+2];S.stations.push({id:o.st[i],lat:a/1e5,lng:b/1e5,name:o.nm[o.st[i+3]]})}
+ a=0;b=0;for(let i=0;i<o.nd.length;i+=5){a+=o.nd[i];b+=o.nd[i+1];S.nodes.push({lat:a/1e5,lng:b/1e5,w:o.nd[i+2]/10,k:o.nd[i+3],name:o.nm[o.nd[i+4]]})}
+ S.lines=o.ln.map(x=>({id:x[0],name:x[1],color:x[2],mode:x[3],lv:x[4],st:x[5]}));
+ hydrate(S);return S;
+}
+function b64(u8){let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s)}
+function b64d(s){const bin=atob(s),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
+async function pack(obj){
+ const bytes=new TextEncoder().encode(JSON.stringify(obj));
+ if(window.CompressionStream){const cs=new CompressionStream('gzip'),w=cs.writable.getWriter();w.write(bytes);w.close();return 'G'+b64(new Uint8Array(await new Response(cs.readable).arrayBuffer()))}
+ return 'R'+b64(bytes);
+}
+async function unpack(str){
+ const bytes=b64d(str.slice(1));
+ if(str[0]==='G'){const ds=new DecompressionStream('gzip'),w=ds.writable.getWriter();w.write(bytes);w.close();return JSON.parse(new TextDecoder().decode(await new Response(ds.readable).arrayBuffer()))}
+ return JSON.parse(new TextDecoder().decode(bytes));
+}
+function lsKey(city){return 'mp_'+(Cloud.user||'local')+'_'+city}
+async function saveLocal(){if(!S)return;try{localStorage.setItem(lsKey(S.city),await pack(serialize(S)))}catch(e){}}
+async function cloudSave(manual){
+ if(!Cloud.on||!S||Cloud.busy)return;Cloud.busy=true;
+ try{
+  const data=await pack(serialize(S)),chunks=[];for(let i=0;i<data.length;i+=40000)chunks.push(data.slice(i,i+40000));
+  const st=statsOf(S,E||evaluate(S));
+  const r=await cloudCall('save',{city:S.city,stats:st,chunks});
+  if(r.ok){Cloud.last=Date.now();Cloud.score=r.puntaje;Cloud.lastErr='';if(manual)toast('☁ Guardado en tu Google Sheet · puntaje '+fmtN(r.puntaje))}
+  else{Cloud.lastErr=r.error||'error';if(manual)toast('No se pudo guardar: '+Cloud.lastErr,4000)}
+ }catch(e){Cloud.lastErr=String(e);if(manual)toast('Sin conexión con el Sheet; se guardó en este dispositivo',4000)}
+ Cloud.busy=false;if(UI.tab==='more')renderSheet();
+}
+async function manualSave(){await saveLocal();if(Cloud.on)await cloudSave(true);else toast('💾 Guardado en este dispositivo')}
+async function cloudCall(action,d){
+ const r=await fetch(Cloud.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action,user:Cloud.user,pin:Cloud.pin},d||{}))});
+ return r.json();
+}
+async function loadSave(city){
+ let loc=null,cl=null;
+ try{const s=localStorage.getItem(lsKey(city));if(s)loc=await unpack(s)}catch(e){}
+ if(Cloud.on&&Cloud.parts[city]){try{const r=await cloudCall('load',{city});if(r.ok&&r.data)cl=await unpack(r.data)}catch(e){}}
+ const best=(cl&&(!loc||cl.ts>=loc.ts))?cl:loc;
+ return best?deserialize(best):null;
+}
+function normUser(u){return String(u||'').trim().toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,24)}
+
+/* ---------- Ciudades: datos reales de OpenStreetMap ---------- */
+const OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+function cityRadius(c){return Math.max(5000,Math.min(16000,4000+c.pop*1100))}
+async function fetchNodes(city){
+ const key='mp_nodes_'+city.id;
+ try{const c=localStorage.getItem(key);if(c){const j=JSON.parse(c);if(j&&j.length>=20)return j}}catch(e){}
+ const R=Math.round(cityRadius(city)),a=`(around:${R},${city.lat},${city.lng})`;
+ const q=`[out:json][timeout:25];(node["place"~"^(suburb|neighbourhood|quarter|town|village|city_block)$"]${a};nwr["amenity"~"^(university|college|hospital|marketplace)$"]${a};nwr["shop"="mall"]${a};nwr["leisure"="stadium"]${a};nwr["aeroway"="aerodrome"]${a};nwr["railway"="station"]["name"]${a};nwr["tourism"="attraction"]["name"]${a};);out center tags 500;`;
+ let els=[];
+ for(const ep of OVERPASS){
+  try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),24000);
+   const r=await fetch(ep,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});clearTimeout(to);
+   if(!r.ok)continue;const j=await r.json();els=j.elements||[];if(els.length)break}catch(e){}
+ }
+ const nodes=buildNodes(city,els,R);
+ if(els.length>=15){try{localStorage.setItem(key,JSON.stringify(nodes))}catch(e){}}
+ return nodes;
+}
+function buildNodes(city,els,R){
+ const rng=mulberry32(hashStr(city.id)),raw=[];
+ for(const e of els){
+  const t=e.tags||{},lat=e.lat!=null?e.lat:(e.center&&e.center.lat),lng=e.lon!=null?e.lon:(e.center&&e.center.lon);if(lat==null||lng==null)continue;
+  let k=t.place||((t.amenity==='university'||t.amenity==='college'||t.amenity==='hospital'||t.amenity==='marketplace')?t.amenity:null)||(t.shop==='mall'?'mall':null)||(t.leisure==='stadium'?'stadium':null)||(t.aeroway?'aerodrome':null)||(t.railway?'station':null)||(t.tourism?'attraction':null);
+  if(!k||!KW[k])continue;
+  raw.push({lat,lng,k,w:KW[k]*(0.7+0.6*rng()),name:t.name||''});
+ }
+ raw.sort((a,b)=>b.w-a.w);
+ const out=[];
+ for(const n of raw){if(out.every(o=>dist(o,n)>250)){if(!n.name)n.name=KINDS[n.k];out.push(n)}if(out.length>=190)break}
+ const c={lat:city.lat,lng:city.lng};
+ out.forEach(n=>{const dc=dist(n,c)/1000;n.w*=1+1.6*Math.exp(-dc/(R/1000*0.3))});
+ let z=1;
+ while(out.length<35){const u=rng()||1e-9,v=rng(),r=Math.sqrt(-2*Math.log(u))*(R/2.6),th=2*Math.PI*v;
+  const lat=c.lat+r*Math.sin(th)/110540,lng=c.lng+r*Math.cos(th)/(111320*Math.cos(c.lat*Math.PI/180));
+  if(out.every(o=>dist(o,{lat,lng})>300)){out.push({lat,lng,k:'zona',w:(15+rng()*20)*(1+1.2*Math.exp(-r/R*3)),name:'Zona '+z});z++}else if(z++>400)break}
+ return out.map(n=>({lat:Math.round(n.lat*1e5)/1e5,lng:Math.round(n.lng*1e5)/1e5,k:n.k,w:Math.round(n.w*10)/10,name:n.name}));
+}
+function hydrate(S){
+ const c=CITY[S.city];S.cm=c.cm;S.car=c.car;S.cityFare=c.fare;S.dc=DIFF[S.diff].c;S.dtot=1e6*Math.pow(c.pop,0.8)*4;S.center={lat:c.lat,lng:c.lng};
+ S.sm={};S.stations.forEach(s=>S.sm[s.id]=s);S.totW=S.nodes.reduce((a,n)=>a+n.w,0);
+}
+function newState(city,diff){
+ const S={v:1,city:city.id,diff,month:1,money:Math.round(120000*city.cm*DIFF[diff].m),fare:city.fare,up:{},stations:[],lines:[],nodes:[],ach:{},ev:[],log:[],nid:1,lid:1,rescues:0};
+ UPG.forEach(u=>S.up[u.id]=0);return S;
+}
+
+/* ---------- Arranque / menús ---------- */
+async function startGame(cityId,diff,fresh){
+ const city=CITY[cityId];clearInterval(timer);
+ showLoading(`Cargando ${city.n}…`);
+ try{
+  let st=fresh?null:await loadSave(cityId);
+  if(!st){
+   showLoading('Descargando barrios y lugares reales de OpenStreetMap…');
+   const nodes=await fetchNodes(city);st=newState(city,diff);st.nodes=nodes;hydrate(st);
+  }
+  S=st;buildPairs(S);UI.lineId=S.lines.length?S.lines[0].id:null;UI.undo=null;UI.tab=null;
+  initMap();map.setView([city.lat,city.lng],13);
+  prevRiders=null;E=evaluate(S);dirty=false;
+  drawDemand();drawNetwork();setTool('explore');setSpeed(UI.speed||1);renderAll();
+  closeModal();
+  const first=!localStorage.getItem('mp_seen');
+  if(first||S.month===1&&!S.stations.length){modal(`<h2>${esc(city.n)}</h2><p class="muted">${esc(city.fact)}</p><p>Hemos cargado barrios, universidades, hospitales y otros puntos reales: son la <b>demanda</b> (🟠 sin servicio, 🟢 con servicio).</p><p style="text-align:right;margin-bottom:0"><button onclick="closeModal();helpModal()">❓ Cómo jugar</button> <button class="pri" onclick="closeModal()">¡A construir!</button></p>`);localStorage.setItem('mp_seen','1')}
+  else toast('Bienvenido de vuelta · '+city.n);
+  setTimeout(()=>map.invalidateSize(),200);
+ }catch(err){modal(`<h2>No se pudo cargar</h2><p class="muted">${esc(String(err))}</p><button onclick="cityMenu()">Volver</button>`)}
+}
+function helpModal(){
+ modal(`<h2>Cómo jugar</h2><div class="cards">
+ <div class="row"><span>1️⃣</span><div>Pulsa <b>🔨 Construir</b>, crea una línea y <b>toca el mapa</b>: cada toque coloca una estación y la une a la anterior.</div></div>
+ <div class="row"><span>2️⃣</span><div>Cubre las zonas <b>🟠 naranjas</b> (demanda sin servicio). Cerca de ellas = más pasajeros. El centro y los grandes polos (universidades, aeropuertos, estadios) pesan más.</div></div>
+ <div class="row"><span>3️⃣</span><div>Haz que las líneas <b>se crucen</b>: los transbordos conectan la red y multiplican los viajes posibles.</div></div>
+ <div class="row"><span>4️⃣</span><div>Cada mes cobras tarifas y pagas mantenimiento. Reinvierte en <b>⬆ mejoras</b>, más trenes por línea y nuevos modos de transporte.</div></div>
+ <div class="row"><span>5️⃣</span><div>Si una línea se satura (barra roja) pierdes pasajeros: añade trenes o una línea paralela. Cumple <b>🏆 metas</b> para ganar premios.</div></div>
+ <div class="row"><span>☁</span><div>Tu progreso se guarda comprimido (estaciones, líneas y mapa de demanda) y se resume en un <b>puntaje</b> que calcula tu Google Sheet.</div></div></div>
+ <p style="text-align:right;margin-bottom:0"><button class="pri" onclick="closeModal()">Entendido</button></p>`);
+}
+function loginModal(msg){
+ modal(`<h2>🚇 Metrópolis</h2><p class="muted">Construye el transporte público de ciudades reales. Inicia sesión para guardar tu progreso en la nube (tu Google Sheet).</p>
+ <p style="margin:8px 0 3px">Usuario</p><input id="lUser" autocomplete="username" value="${esc(localStorage.getItem('mp_user')||'')}" placeholder="angel">
+ <p style="margin:8px 0 3px">PIN (4+ dígitos; si es tu primera vez se crea la cuenta)</p><input id="lPin" type="password" inputmode="numeric" autocomplete="current-password">
+ <p style="margin:8px 0 3px">URL del Apps Script (Google Sheet)</p><input id="lUrl" value="${esc(localStorage.getItem('mp_url')||DEFAULT_SHEET_URL)}" placeholder="https://script.google.com/macros/s/…/exec">
+ ${msg?`<p style="color:var(--bad)">${esc(msg)}</p>`:''}
+ <div class="grid" style="margin-top:10px"><button class="pri" onclick="doLogin()">Entrar</button><button onclick="playOffline()">Jugar sin cuenta</button></div>
+ <p class="muted">Sin cuenta: se guarda solo en este dispositivo.</p>`);
+}
+async function doLogin(){
+ const user=normUser($('lUser').value),pin=$('lPin').value,url=$('lUrl').value.trim();
+ if(!url){playOffline($('lUser').value);return}
+ if(user.length<3)return loginModal('El usuario necesita 3 o más letras/números');
+ if(pin.length<4)return loginModal('El PIN necesita 4 o más caracteres');
+ showLoading('Conectando con tu Google Sheet…');
+ Cloud.url=url;Cloud.user=user;Cloud.pin=pin;
+ try{
+  const r=await cloudCall('login');
+  if(!r.ok){Cloud.on=false;return loginModal(r.error||'No se pudo entrar')}
+  Cloud.on=true;Cloud.parts={};(r.partidas||[]).forEach(p=>Cloud.parts[p.ciudad]=p);
+  localStorage.setItem('mp_user',user);localStorage.setItem('mp_url',url);
+  if(r.nuevo)toast('Cuenta creada. ¡Bienvenido, '+user+'!',3000);
+  cityMenu();
+ }catch(e){Cloud.on=false;loginModal('No se pudo conectar con el Sheet. Revisa la URL (debe terminar en /exec y estar implementada para "Cualquier persona").')}
+}
+function playOffline(u){Cloud.on=false;Cloud.user=normUser(u||($('lUser')&&$('lUser').value))||'local';Cloud.parts={};cityMenu()}
+function logout(){clearInterval(timer);S=null;Cloud.on=false;Cloud.pin='';closeModalTab();loginModal()}
+function closeModalTab(){UI.tab=null;$('sheet').className=''}
+let selCity=null,selDiff='normal';
+function cityMenu(filter){
+ clearInterval(timer);timer=null;if(S)saveLocal();if(S&&Cloud.on)cloudSave(false);
+ filter=(filter||'').toLowerCase();
+ const list=CITIES.filter(c=>!filter||c.n.toLowerCase().includes(filter));
+ let h=`<h2>Elige tu ciudad</h2><input id="cSearch" placeholder="Buscar ciudad…" value="${esc(filter)}" oninput="cityMenu(this.value)" style="margin-bottom:8px">`;
+ h+='<div style="max-height:38vh;overflow:auto">';
+ for(const c of list){const p=Cloud.parts[c.id],loc=!!localStorage.getItem(lsKey(c.id));
+  h+=`<button class="city ${selCity===c.id?'sel':''}" onclick="selCity='${c.id}';cityMenu($('cSearch').value)"><span><b>${esc(c.n)}</b> <span class="muted">${c.c} · ${c.pop} M hab.</span></span><span class="muted">${p?'⭐ '+fmtN(p.puntaje):loc?'💾':''}</span></button>`}
+ h+='</div>';
+ const sc=selCity&&CITY[selCity];
+ if(sc){const has=!!Cloud.parts[sc.id]||!!localStorage.getItem(lsKey(sc.id));
+  h+=`<p class="muted" style="margin:8px 0">${esc(sc.fact)}</p><select id="dSel" onchange="selDiff=this.value">${Object.keys(DIFF).map(k=>`<option value="${k}" ${selDiff===k?'selected':''}>${DIFF[k].n}</option>`).join('')}</select>
+  <div class="grid" style="margin-top:8px">${has?`<button class="pri" onclick="startGame('${sc.id}',selDiff,false)">▶ Continuar</button><button onclick="if(confirm('Se perderá el avance de esta ciudad. ¿Empezar de cero?'))startGame('${sc.id}',selDiff,true)">Nueva partida</button>`:`<button class="pri" style="grid-column:span 2" onclick="startGame('${sc.id}',selDiff,true)">▶ Jugar en ${esc(sc.n)}</button>`}</div>`;
+ }
+ if(S)h+='<p style="text-align:right;margin:10px 0 0"><button onclick="closeModal();startTimer()">Cerrar</button></p>';
+ modal(h);
+ const i=$('cSearch');if(i&&filter){i.focus();i.setSelectionRange(filter.length,filter.length)}
+}
+async function showRanking(){
+ showLoading('Cargando ranking…');
+ try{const r=await cloudCall('top');if(!r.ok)throw new Error(r.error);
+  modal(`<h2>🏅 Ranking</h2>${(r.top||[]).map((x,i)=>`<div class="row"><b>${i+1}</b><div class="grow">${esc(x.usuario)}</div><b>${fmtN(x.total)}</b></div>`).join('')||'<p class="muted">Aún no hay jugadores.</p>'}<p style="text-align:right"><button onclick="closeModal()">Cerrar</button></p>`);
+ }catch(e){modal('<p>No se pudo cargar el ranking.</p><button onclick="closeModal()">Cerrar</button>')}
+}
+
+window.addEventListener('pagehide',()=>{if(S)saveLocal()});
+window.addEventListener('DOMContentLoaded',()=>{loginModal()});
+</script>
+</body>
+</html>
